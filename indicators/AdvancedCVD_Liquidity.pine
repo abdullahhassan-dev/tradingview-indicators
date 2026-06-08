@@ -72,12 +72,12 @@ plotshape(cvdHistogram > 0 ? cvdHistogram : na, style=shape.bars, location=locat
 plotshape(cvdHistogram < 0 ? cvdHistogram : na, style=shape.bars, location=location.bottom, color=color.new(color.red, 60), title="CVD Bearish")
 
 // Confluence signals
-plotshape(confluenceBuy and strongVolume, style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), size=size.large, text="🎯 CONFLUENCE BUY")
+plotshape(confluenceBuy and strongVolume, style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), size=size.large, text="🎯 BUY")
 
-plotshape(confluenceSell and strongVolume, style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), size=size.large, text="🎯 CONFLUENCE SELL")
+plotshape(confluenceSell and strongVolume, style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), size=size.large, text="🎯 SELL")
 
 // Trap detection warning
-plotshape(trapDetection, style=shape.diamond, location=location.abovebar, color=color.new(color.orange, 50), size=size.small, title="Trap Warning")
+plotshape(trapDetection, style=shape.diamond, location=location.abovebar, color=color.new(color.orange, 50), size=size.small, title="⚡ TRAP")
 
 // High volume zones background
 bgcolor(highVolZone ? color.new(color.yellow, 90) : na, title="High Volume Zone")
@@ -93,4 +93,4 @@ if confluenceSell and strongVolume
     alert("⚠️ HIGH PROBABILITY SELL - Confluence + Strong Volume", alert.freq_once_per_bar)
 
 if trapDetection
-    alert("⚡ TRAP DETECTED - Be careful, retail traders are being trapped!", alert.freq_once_per_bar)
+    alert("⚡ TRAP DETECTED - Avoid this trade!", alert.freq_once_per_bar)

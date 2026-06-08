@@ -1,0 +1,137 @@
+//@version=5
+indicator("🎯 Smart Money Order Blocks + CVD", overlay=true, max_bars_back=500)
+
+// ============================================
+// INPUT SETTINGS
+// ============================================
+
+// EMA Settings
+ema7 = ta.ema(close, 7)
+ema25 = ta.ema(close, 25)
+ema99 = ta.ema(close, 99)
+
+// Order Block Detection
+obLookback = input(20, "Order Block Lookback", minval=5, maxval=100)
+obSensitivity = input(2.0, "OB Sensitivity", minval=1.0, maxval=5.0)
+
+// CVD Settings
+cvdLength = input(50, "CVD Length", minval=10, maxval=200)
+
+// Volume Profile
+volProfileLength = input(20, "Volume Profile Bars", minval=5, maxval=100)
+
+// Colors
+colorBuy = input(color.new(color.green, 80), "Buy Signal Color")
+colorSell = input(color.new(color.red, 80), "Sell Signal Color")
+colorOB = input(color.new(color.blue, 90), "Order Block Color")
+
+// Alerts
+enableAlerts = input(true, "Enable Alerts")
+
+// ============================================
+// CVD CALCULATION
+// ============================================
+
+// Cumulative Volume Delta
+delta = (close > open ? volume : close < open ? -volume : 0)
+cvd = ta.cum(delta)
+cvdMA = ta.ema(cvd, cvdLength)
+cvdDifference = cvd - cvdMA
+
+// ============================================
+// ORDER BLOCK DETECTION
+// ============================================
+
+// Detect impulse moves (strong directional movement)
+highestHigh = ta.highest(high, obLookback)
+lowestLow = ta.lowest(low, obLookback)
+impulseRange = highestHigh - lowestLow
+
+// Bullish Order Block (consolidation before break up)
+bullishOB = false
+if ta.crossover(close, ema25) and cvdDifference > 0
+    bullishOB := true
+
+// Bearish Order Block (consolidation before break down)
+bearishOB = false
+if ta.crossunder(close, ema25) and cvdDifference < 0
+    bearishOB := true
+
+// ============================================
+// ENTRY SIGNALS
+// ============================================
+
+// Buy Signal: Price > EMA7 > EMA25 > EMA99 + CVD Bullish
+buySignal = close > ema7 and ema7 > ema25 and ema25 > ema99 and cvdDifference > 0 and bullishOB
+sellSignal = close < ema7 and ema7 < ema25 and ema25 < ema99 and cvdDifference < 0 and bearishOB
+
+// ============================================
+// LIQUIDITY LEVELS (High Volume Zones)
+// ============================================
+
+avgVolume = ta.ema(volume, volProfileLength)
+highVolume = volume > avgVolume * 1.5
+
+// ============================================
+// PLOTTING
+// ============================================
+
+// Plot EMAs
+plot(ema7, color=color.new(color.orange, 0), linewidth=2, title="EMA 7")
+plot(ema25, color=color.new(color.blue, 0), linewidth=2, title="EMA 25")
+plot(ema99, color=color.new(color.purple, 0), linewidth=2, title="EMA 99")
+
+// Plot Order Blocks as backgrounds
+bgcolor(bullishOB ? color.new(color.green, 90) : na, title="Bullish Order Block")
+bgcolor(bearishOB ? color.new(color.red, 90) : na, title="Bearish Order Block")
+
+// Plot Entry Signals
+plotshape(buySignal, style=shape.labelup, location=location.belowbar, 
+     color=colorBuy, size=size.large, text="BUY", title="Buy Signal")
+plotshape(sellSignal, style=shape.labeldown, location=location.abovebar, 
+     color=colorSell, size=size.large, text="SELL", title="Sell Signal")
+
+// Plot High Volume zones
+barcolor(highVolume and close > open ? color.new(color.green, 50) : 
+         highVolume and close < open ? color.new(color.red, 50) : na)
+
+// ============================================
+// ALERTS
+// ============================================
+
+if enableAlerts
+    if buySignal
+        alert("🎯 BUY SIGNAL - Check Order Block + CVD", alert.freq_once_per_bar)
+    if sellSignal
+        alert("⚠️ SELL SIGNAL - Check Order Block + CVD", alert.freq_once_per_bar)
+
+// ============================================
+// INFO PANEL (Table)
+// ============================================
+
+var table infoTable = table.new(position.top_right, 2, 6, 
+     border_color=color.gray, border_width=1)
+
+table.cell(infoTable, 0, 0, "INDICATOR STATUS", text_color=color.white, 
+     bgcolor=color.new(color.black, 50))
+table.cell(infoTable, 1, 0, "", text_color=color.white, bgcolor=color.new(color.black, 50))
+
+table.cell(infoTable, 0, 1, "EMA Trend:", text_color=color.white, bgcolor=color.new(color.black, 50))
+table.cell(infoTable, 1, 1, ema7 > ema25 ? "📈 BULLISH" : "📉 BEARISH", 
+     text_color=ema7 > ema25 ? color.green : color.red, bgcolor=color.new(color.black, 50))
+
+table.cell(infoTable, 0, 2, "CVD Signal:", text_color=color.white, bgcolor=color.new(color.black, 50))
+table.cell(infoTable, 1, 2, cvdDifference > 0 ? "💚 STRONG" : "💔 WEAK", 
+     text_color=cvdDifference > 0 ? color.green : color.red, bgcolor=color.new(color.black, 50))
+
+table.cell(infoTable, 0, 3, "Order Block:", text_color=color.white, bgcolor=color.new(color.black, 50))
+table.cell(infoTable, 1, 3, bullishOB ? "🟢 BUY ZONE" : bearishOB ? "🔴 SELL ZONE" : "⚪ NONE", 
+     text_color=bullishOB ? color.green : bearishOB ? color.red : color.gray, bgcolor=color.new(color.black, 50))
+
+table.cell(infoTable, 0, 4, "Volume Profile:", text_color=color.white, bgcolor=color.new(color.black, 50))
+table.cell(infoTable, 1, 4, highVolume ? "📊 HIGH" : "📉 LOW", 
+     text_color=highVolume ? color.green : color.orange, bgcolor=color.new(color.black, 50))
+
+table.cell(infoTable, 0, 5, "Signal Status:", text_color=color.white, bgcolor=color.new(color.black, 50))
+table.cell(infoTable, 1, 5, buySignal ? "✅ BUY" : sellSignal ? "❌ SELL" : "⏳ WAIT", 
+     text_color=buySignal ? color.green : sellSignal ? color.red : color.gray, bgcolor=color.new(color.black, 50))

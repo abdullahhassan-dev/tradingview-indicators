@@ -1,0 +1,172 @@
+//@version=5
+indicator("🏦 Institutional Flow Pro (Estimated Bias)", overlay=true, max_bars_back=1000, max_labels_count=500)
+
+// ============================================
+// INPUT SETTINGS
+// ============================================
+
+// Trend Inputs
+emaFastLen = input.int(7, "EMA Fast Length", minval=2, maxval=200)
+emaMidLen = input.int(25, "EMA Mid Length", minval=3, maxval=300)
+emaSlowLen = input.int(99, "EMA Slow Length", minval=5, maxval=500)
+
+// CVD / Pressure Inputs
+cvdSmoothLen = input.int(34, "CVD Smoothing Length", minval=5, maxval=300)
+pressureLookback = input.int(50, "Pressure Lookback", minval=10, maxval=500)
+
+// Liquidity + Volume Inputs
+sweepLookback = input.int(20, "Liquidity Sweep Lookback", minval=5, maxval=200)
+volLookback = input.int(20, "Volume EMA Length", minval=5, maxval=200)
+highVolMultiplier = input.float(1.5, "High Volume Multiplier", minval=1.0, maxval=5.0, step=0.1)
+
+// Confluence Inputs
+minScoreForSignal = input.int(4, "Minimum Confluence Score (1-5)", minval=1, maxval=5)
+
+// Risk/News Placeholder Inputs
+enableRiskFilter = input.bool(true, "Enable Risk/News Placeholder Filter")
+manualNewsRisk = input.bool(false, "⚠️ Manual High-Impact News Risk")
+riskSession = input.session("1230-1400", "Risk Session (Exchange Time)")
+
+// Visual Inputs
+showEMAs = input.bool(true, "Show EMA Trend")
+showLiquidityMarks = input.bool(true, "Show Liquidity Sweep Marks")
+
+// ============================================
+// CORE CALCULATIONS
+// ============================================
+
+// EMA Trend
+emaFast = ta.ema(close, emaFastLen)
+emaMid = ta.ema(close, emaMidLen)
+emaSlow = ta.ema(close, emaSlowLen)
+
+trendBull = emaFast > emaMid and emaMid > emaSlow
+trendBear = emaFast < emaMid and emaMid < emaSlow
+
+// CVD Proxy Pressure
+delta = close > open ? volume : close < open ? -volume : 0
+cvd = ta.cum(delta)
+cvdSmoothed = ta.ema(cvd, cvdSmoothLen)
+cvdSignal = ta.ema(cvdSmoothed, 9)
+cvdPressure = cvdSmoothed - cvdSignal
+
+pressureBull = cvdPressure > 0 and cvdPressure > ta.lowest(cvdPressure, pressureLookback) * 0.2
+pressureBear = cvdPressure < 0 and cvdPressure < ta.highest(cvdPressure, pressureLookback) * 0.2
+
+// High Volume Confirmation
+avgVol = ta.ema(volume, volLookback)
+highVol = volume > avgVol * highVolMultiplier
+
+// Liquidity Sweep / Stop Hunt Behavior
+prevLowest = ta.lowest(low[1], sweepLookback)
+prevHighest = ta.highest(high[1], sweepLookback)
+
+sweepLow = low < prevLowest and close > prevLowest
+sweepHigh = high > prevHighest and close < prevHighest
+
+liquidityBuyBias = sweepLow
+liquiditySellBias = sweepHigh
+
+// Institutional Footprint (Estimated)
+instBuyFootprint = liquidityBuyBias and pressureBull and highVol
+instSellFootprint = liquiditySellBias and pressureBear and highVol
+
+// ============================================
+// CONFLUENCE MODEL
+// ============================================
+
+longScore = 0
+longScore += trendBull ? 1 : 0
+longScore += pressureBull ? 1 : 0
+longScore += liquidityBuyBias ? 1 : 0
+longScore += highVol ? 1 : 0
+longScore += instBuyFootprint ? 1 : 0
+
+shortScore = 0
+shortScore += trendBear ? 1 : 0
+shortScore += pressureBear ? 1 : 0
+shortScore += liquiditySellBias ? 1 : 0
+shortScore += highVol ? 1 : 0
+shortScore += instSellFootprint ? 1 : 0
+
+inRiskSession = not na(time(timeframe.period, riskSession))
+riskBlocked = enableRiskFilter and (manualNewsRisk or inRiskSession)
+
+longRaw = longScore >= minScoreForSignal and longScore > shortScore
+shortRaw = shortScore >= minScoreForSignal and shortScore > longScore
+
+longSignal = longRaw and not riskBlocked
+shortSignal = shortRaw and not riskBlocked
+
+// ============================================
+// PLOTTING
+// ============================================
+
+plot(showEMAs ? emaFast : na, title="EMA Fast", color=color.new(color.orange, 0), linewidth=2)
+plot(showEMAs ? emaMid : na, title="EMA Mid", color=color.new(color.blue, 0), linewidth=2)
+plot(showEMAs ? emaSlow : na, title="EMA Slow", color=color.new(color.purple, 0), linewidth=2)
+
+plotshape(showLiquidityMarks and liquidityBuyBias, title="Liquidity Sweep Low", style=shape.triangleup, location=location.belowbar, color=color.new(color.green, 0), text="💧 Sweep", textcolor=color.white, size=size.tiny)
+plotshape(showLiquidityMarks and liquiditySellBias, title="Liquidity Sweep High", style=shape.triangledown, location=location.abovebar, color=color.new(color.red, 0), text="💧 Sweep", textcolor=color.white, size=size.tiny)
+
+plotshape(instBuyFootprint, title="Estimated Institutional Buy Footprint", style=shape.circle, location=location.belowbar, color=color.new(color.lime, 0), size=size.tiny, text="🏦")
+plotshape(instSellFootprint, title="Estimated Institutional Sell Footprint", style=shape.circle, location=location.abovebar, color=color.new(color.maroon, 0), size=size.tiny, text="🏦")
+
+plotshape(longSignal, title="Long Signal", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), text="🟢 LONG\nProb Bias", textcolor=color.white, size=size.small)
+plotshape(shortSignal, title="Short Signal", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), text="🔴 SHORT\nProb Bias", textcolor=color.white, size=size.small)
+
+bgcolor(highVol ? color.new(color.yellow, 92) : na, title="High Volume Context")
+bgcolor(riskBlocked ? color.new(color.orange, 88) : na, title="Risk/News Placeholder Warning")
+
+// ============================================
+// ALERTS
+// ============================================
+
+alertcondition(longSignal, "InstitutionalFlow Pro - Long", "🟢 InstitutionalFlow Pro: Estimated LONG bias confluence detected.")
+alertcondition(shortSignal, "InstitutionalFlow Pro - Short", "🔴 InstitutionalFlow Pro: Estimated SHORT bias confluence detected.")
+alertcondition(riskBlocked and (longRaw or shortRaw), "InstitutionalFlow Pro - Risk Filter Warning", "⚠️ InstitutionalFlow Pro: Signal blocked by manual/news/session risk filter.")
+
+// ============================================
+// STATUS PANEL
+// ============================================
+
+trendText = trendBull ? "📈 Bullish" : trendBear ? "📉 Bearish" : "⚪ Neutral"
+trendColor = trendBull ? color.green : trendBear ? color.red : color.gray
+
+pressureText = pressureBull ? "💚 Buy Pressure" : pressureBear ? "💔 Sell Pressure" : "⚪ Flat"
+pressureColor = pressureBull ? color.green : pressureBear ? color.red : color.gray
+
+liquidityText = liquidityBuyBias ? "🟢 Sweep-Long" : liquiditySellBias ? "🔴 Sweep-Short" : "⚪ No Sweep"
+liquidityColor = liquidityBuyBias ? color.green : liquiditySellBias ? color.red : color.gray
+
+volumeText = highVol ? "📊 High Volume" : "📉 Normal Volume"
+volumeColor = highVol ? color.green : color.orange
+
+signalText = longSignal ? "✅ Long Setup" : shortSignal ? "✅ Short Setup" : riskBlocked and (longRaw or shortRaw) ? "⛔ Risk Blocked" : "⏳ Wait"
+signalColor = longSignal ? color.green : shortSignal ? color.red : riskBlocked and (longRaw or shortRaw) ? color.orange : color.gray
+
+scoreText = "L:" + str.tostring(longScore) + "/5 | S:" + str.tostring(shortScore) + "/5"
+
+var table statusTable = table.new(position.top_right, 2, 7, border_color=color.gray, border_width=1)
+if barstate.islast
+    panelBg = color.new(color.black, 50)
+    table.cell(statusTable, 0, 0, "🏦 FLOW STATUS", text_color=color.white, bgcolor=panelBg)
+    table.cell(statusTable, 1, 0, "Estimated", text_color=color.white, bgcolor=panelBg)
+
+    table.cell(statusTable, 0, 1, "Trend", text_color=color.white, bgcolor=panelBg)
+    table.cell(statusTable, 1, 1, trendText, text_color=trendColor, bgcolor=panelBg)
+
+    table.cell(statusTable, 0, 2, "CVD Pressure", text_color=color.white, bgcolor=panelBg)
+    table.cell(statusTable, 1, 2, pressureText, text_color=pressureColor, bgcolor=panelBg)
+
+    table.cell(statusTable, 0, 3, "Liquidity Bias", text_color=color.white, bgcolor=panelBg)
+    table.cell(statusTable, 1, 3, liquidityText, text_color=liquidityColor, bgcolor=panelBg)
+
+    table.cell(statusTable, 0, 4, "Volume State", text_color=color.white, bgcolor=panelBg)
+    table.cell(statusTable, 1, 4, volumeText, text_color=volumeColor, bgcolor=panelBg)
+
+    table.cell(statusTable, 0, 5, "Confluence", text_color=color.white, bgcolor=panelBg)
+    table.cell(statusTable, 1, 5, scoreText, text_color=color.white, bgcolor=panelBg)
+
+    table.cell(statusTable, 0, 6, "Final Signal", text_color=color.white, bgcolor=panelBg)
+    table.cell(statusTable, 1, 6, signalText, text_color=signalColor, bgcolor=panelBg)

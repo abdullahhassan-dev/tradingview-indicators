@@ -29,6 +29,11 @@ Professional-grade TradingView indicators combining Smart Money concepts, instit
 - Green signals = BUY confirmation
 - Red signals = SELL confirmation
 
+### 6. **Institutional Flow Pro (Estimated Bias)**
+- Confluence model for long/short setup strength
+- Combines EMA trend + CVD pressure + liquidity sweeps + volume
+- Includes risk/news session warning placeholder and signal alerts
+
 ## 🚀 How to Use
 
 1. **Copy the Pine Script** from `indicators/` folder

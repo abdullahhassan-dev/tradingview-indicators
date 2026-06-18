@@ -23,6 +23,7 @@ volLookback = input.int(20, "Volume EMA Length", minval=5, maxval=200)
 highVolMultiplier = input.float(1.5, "High Volume Multiplier", minval=1.0, maxval=5.0, step=0.1)
 
 // Confluence Inputs
+maxScore = 5
 minScoreForSignal = input.int(4, "Minimum Confluence Score (1-5)", minval=1, maxval=5)
 
 // Risk/News Placeholder Inputs
@@ -47,7 +48,13 @@ trendBull = emaFast > emaMid and emaMid > emaSlow
 trendBear = emaFast < emaMid and emaMid < emaSlow
 
 // CVD Proxy Pressure
-deltaDirection = close > close[1] ? 1 : close < close[1] ? -1 : close >= open ? 1 : -1
+deltaDirection = 1
+if close > close[1]
+    deltaDirection := 1
+else if close < close[1]
+    deltaDirection := -1
+else if close < open
+    deltaDirection := -1
 delta = deltaDirection * volume
 cvd = ta.cum(delta)
 cvdSmoothed = ta.ema(cvd, cvdSmoothLen)
@@ -66,11 +73,11 @@ avgVol = ta.ema(volume, volLookback)
 highVol = volume > avgVol * highVolMultiplier
 
 // Liquidity Sweep / Stop Hunt Behavior
-prevLowest = ta.lowest(low[1], sweepLookback)
-prevHighest = ta.highest(high[1], sweepLookback)
+sweepLookbackLow = ta.lowest(low[1], sweepLookback)
+sweepLookbackHigh = ta.highest(high[1], sweepLookback)
 
-sweepLow = low < prevLowest and close > prevLowest
-sweepHigh = high > prevHighest and close < prevHighest
+sweepLow = low < sweepLookbackLow and close > sweepLookbackLow
+sweepHigh = high > sweepLookbackHigh and close < sweepLookbackHigh
 
 liquidityBuyBias = sweepLow
 liquiditySellBias = sweepHigh
@@ -153,7 +160,7 @@ volumeColor = highVol ? color.green : color.orange
 signalText = longSignal ? "✅ Long Setup" : shortSignal ? "✅ Short Setup" : riskBlocked and (longRaw or shortRaw) ? "⛔ Risk Blocked" : "⏳ Wait"
 signalColor = longSignal ? color.green : shortSignal ? color.red : riskBlocked and (longRaw or shortRaw) ? color.orange : color.gray
 
-scoreText = "L:" + str.tostring(longScore) + "/5 | S:" + str.tostring(shortScore) + "/5"
+scoreText = "L:" + str.tostring(longScore) + "/" + str.tostring(maxScore) + " | S:" + str.tostring(shortScore) + "/" + str.tostring(maxScore)
 
 var table statusTable = table.new(position.top_right, 2, 7, border_color=color.gray, border_width=1)
 if barstate.islast

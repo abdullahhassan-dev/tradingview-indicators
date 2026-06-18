@@ -46,22 +46,23 @@ trendBull = emaFast > emaMid and emaMid > emaSlow
 trendBear = emaFast < emaMid and emaMid < emaSlow
 
 // CVD Proxy Pressure
-delta = close > open ? volume : close < open ? -volume : 0
+delta = close > close[1] ? volume : close < close[1] ? -volume : 0
 cvd = ta.cum(delta)
 cvdSmoothed = ta.ema(cvd, cvdSmoothLen)
 cvdSignal = ta.ema(cvdSmoothed, cvdSignalLen)
 cvdPressure = cvdSmoothed - cvdSignal
 
-pressureBull = cvdPressure > 0 and cvdPressure > ta.lowest(cvdPressure, pressureLookback) * pressureThresholdPct
-pressureBear = cvdPressure < 0 and cvdPressure < ta.highest(cvdPressure, pressureLookback) * pressureThresholdPct
+pressureRange = math.max(math.abs(ta.highest(cvdPressure, pressureLookback)), math.abs(ta.lowest(cvdPressure, pressureLookback)))
+pressureBull = cvdPressure > pressureRange * pressureThresholdPct
+pressureBear = cvdPressure < -pressureRange * pressureThresholdPct
 
 // High Volume Confirmation
 avgVol = ta.ema(volume, volLookback)
 highVol = volume > avgVol * highVolMultiplier
 
 // Liquidity Sweep / Stop Hunt Behavior
-prevLowest = ta.lowest(low[1], sweepLookback)
-prevHighest = ta.highest(high[1], sweepLookback)
+prevLowest = ta.lowest(low, sweepLookback)[1]
+prevHighest = ta.highest(high, sweepLookback)[1]
 
 sweepLow = low < prevLowest and close > prevLowest
 sweepHigh = high > prevHighest and close < prevHighest
@@ -91,7 +92,7 @@ shortScore += liquiditySellBias ? 1 : 0
 shortScore += highVol ? 1 : 0
 shortScore += instSellFootprint ? 1 : 0
 
-isInRiskSession = not na(time(timeframe.period, riskSession))
+isInRiskSession = not na(time("", riskSession))
 riskBlocked = enableRiskFilter and (manualNewsRisk or isInRiskSession)
 
 longRaw = longScore >= minScoreForSignal and longScore > shortScore
@@ -114,8 +115,8 @@ plotshape(showLiquidityMarks and liquiditySellBias, title="Liquidity Sweep High"
 plotshape(instBuyFootprint, title="Estimated Institutional Buy Footprint", style=shape.circle, location=location.belowbar, color=color.new(color.lime, 0), size=size.tiny, text="🏦")
 plotshape(instSellFootprint, title="Estimated Institutional Sell Footprint", style=shape.circle, location=location.abovebar, color=color.new(color.maroon, 0), size=size.tiny, text="🏦")
 
-plotshape(longSignal, title="Long Signal", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), text="🟢 LONG\nProb Bias", textcolor=color.white, size=size.small)
-plotshape(shortSignal, title="Short Signal", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), text="🔴 SHORT\nProb Bias", textcolor=color.white, size=size.small)
+plotshape(longSignal, title="Long Signal", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), text="🟢 LONG\nProbable Bias", textcolor=color.white, size=size.small)
+plotshape(shortSignal, title="Short Signal", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), text="🔴 SHORT\nProbable Bias", textcolor=color.white, size=size.small)
 
 bgcolor(highVol ? color.new(color.yellow, 92) : na, title="High Volume Context")
 bgcolor(riskBlocked ? color.new(color.orange, 88) : na, title="Risk/News Placeholder Warning")

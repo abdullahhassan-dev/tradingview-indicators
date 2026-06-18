@@ -48,13 +48,13 @@ trendBull = emaFast > emaMid and emaMid > emaSlow
 trendBear = emaFast < emaMid and emaMid < emaSlow
 
 // CVD Proxy Pressure
-deltaDirection = 1
+deltaDirection = 0
 if close > close[1]
     deltaDirection := 1
 else if close < close[1]
     deltaDirection := -1
-else if close < open
-    deltaDirection := -1
+else
+    deltaDirection := close < open ? -1 : 1
 delta = deltaDirection * volume
 cvd = ta.cum(delta)
 cvdSmoothed = ta.ema(cvd, cvdSmoothLen)

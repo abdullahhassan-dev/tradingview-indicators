@@ -12,7 +12,9 @@ emaSlowLen = input.int(99, "EMA Slow Length", minval=5, maxval=500)
 
 // CVD / Pressure Inputs
 cvdSmoothLen = input.int(34, "CVD Smoothing Length", minval=5, maxval=300)
+cvdSignalLen = input.int(9, "CVD Signal Length", minval=2, maxval=100)
 pressureLookback = input.int(50, "Pressure Lookback", minval=10, maxval=500)
+pressureThresholdPct = input.float(0.2, "Pressure Threshold %", minval=0.05, maxval=1.0, step=0.05)
 
 // Liquidity + Volume Inputs
 sweepLookback = input.int(20, "Liquidity Sweep Lookback", minval=5, maxval=200)
@@ -47,11 +49,11 @@ trendBear = emaFast < emaMid and emaMid < emaSlow
 delta = close > open ? volume : close < open ? -volume : 0
 cvd = ta.cum(delta)
 cvdSmoothed = ta.ema(cvd, cvdSmoothLen)
-cvdSignal = ta.ema(cvdSmoothed, 9)
+cvdSignal = ta.ema(cvdSmoothed, cvdSignalLen)
 cvdPressure = cvdSmoothed - cvdSignal
 
-pressureBull = cvdPressure > 0 and cvdPressure > ta.lowest(cvdPressure, pressureLookback) * 0.2
-pressureBear = cvdPressure < 0 and cvdPressure < ta.highest(cvdPressure, pressureLookback) * 0.2
+pressureBull = cvdPressure > 0 and cvdPressure > ta.lowest(cvdPressure, pressureLookback) * pressureThresholdPct
+pressureBear = cvdPressure < 0 and cvdPressure < ta.highest(cvdPressure, pressureLookback) * pressureThresholdPct
 
 // High Volume Confirmation
 avgVol = ta.ema(volume, volLookback)
@@ -89,8 +91,8 @@ shortScore += liquiditySellBias ? 1 : 0
 shortScore += highVol ? 1 : 0
 shortScore += instSellFootprint ? 1 : 0
 
-inRiskSession = not na(time(timeframe.period, riskSession))
-riskBlocked = enableRiskFilter and (manualNewsRisk or inRiskSession)
+isInRiskSession = not na(time(timeframe.period, riskSession))
+riskBlocked = enableRiskFilter and (manualNewsRisk or isInRiskSession)
 
 longRaw = longScore >= minScoreForSignal and longScore > shortScore
 shortRaw = shortScore >= minScoreForSignal and shortScore > longScore

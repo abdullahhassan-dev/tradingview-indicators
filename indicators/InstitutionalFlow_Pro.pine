@@ -46,13 +46,15 @@ trendBull = emaFast > emaMid and emaMid > emaSlow
 trendBear = emaFast < emaMid and emaMid < emaSlow
 
 // CVD Proxy Pressure
-delta = close > close[1] ? volume : close < close[1] ? -volume : 0
+deltaDirection = close > close[1] ? 1 : close < close[1] ? -1 : close > open ? 1 : close < open ? -1 : 0
+delta = deltaDirection * volume
 cvd = ta.cum(delta)
 cvdSmoothed = ta.ema(cvd, cvdSmoothLen)
 cvdSignal = ta.ema(cvdSmoothed, cvdSignalLen)
 cvdPressure = cvdSmoothed - cvdSignal
 
-pressureRange = math.max(math.abs(ta.highest(cvdPressure, pressureLookback)), math.abs(ta.lowest(cvdPressure, pressureLookback)))
+rawPressureRange = math.max(math.abs(ta.highest(cvdPressure, pressureLookback)), math.abs(ta.lowest(cvdPressure, pressureLookback)))
+pressureRange = math.max(rawPressureRange, 1e-10)
 pressureBull = cvdPressure > pressureRange * pressureThresholdPct
 pressureBear = cvdPressure < -pressureRange * pressureThresholdPct
 

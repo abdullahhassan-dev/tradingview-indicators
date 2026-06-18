@@ -15,6 +15,7 @@ cvdSmoothLen = input.int(34, "CVD Smoothing Length", minval=5, maxval=300)
 cvdSignalLen = input.int(9, "CVD Signal Length", minval=2, maxval=100)
 pressureLookback = input.int(50, "Pressure Lookback", minval=10, maxval=500)
 pressureThresholdPct = input.float(0.2, "Pressure Threshold %", minval=0.05, maxval=1.0, step=0.05)
+pressureRangeFloor = input.float(1e-10, "Pressure Range Floor", minval=1e-10, maxval=0.1, step=1e-10)
 
 // Liquidity + Volume Inputs
 sweepLookback = input.int(20, "Liquidity Sweep Lookback", minval=5, maxval=200)
@@ -46,15 +47,25 @@ trendBull = emaFast > emaMid and emaMid > emaSlow
 trendBear = emaFast < emaMid and emaMid < emaSlow
 
 // CVD Proxy Pressure
-deltaDirection = close > close[1] ? 1 : close < close[1] ? -1 : close > open ? 1 : close < open ? -1 : 0
+deltaDirection = 0
+if close > close[1]
+    deltaDirection := 1
+else if close < close[1]
+    deltaDirection := -1
+else if close > open
+    deltaDirection := 1
+else if close < open
+    deltaDirection := -1
 delta = deltaDirection * volume
 cvd = ta.cum(delta)
 cvdSmoothed = ta.ema(cvd, cvdSmoothLen)
 cvdSignal = ta.ema(cvdSmoothed, cvdSignalLen)
 cvdPressure = cvdSmoothed - cvdSignal
 
-rawPressureRange = math.max(math.abs(ta.highest(cvdPressure, pressureLookback)), math.abs(ta.lowest(cvdPressure, pressureLookback)))
-pressureRange = math.max(rawPressureRange, 1e-10)
+highestPressure = ta.highest(cvdPressure, pressureLookback)
+lowestPressure = ta.lowest(cvdPressure, pressureLookback)
+rawPressureRange = math.max(math.abs(highestPressure), math.abs(lowestPressure))
+pressureRange = math.max(rawPressureRange, pressureRangeFloor)
 pressureBull = cvdPressure > pressureRange * pressureThresholdPct
 pressureBear = cvdPressure < -pressureRange * pressureThresholdPct
 
